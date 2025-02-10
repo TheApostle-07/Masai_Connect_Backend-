@@ -14,7 +14,6 @@ const platforms = {
     ZOOM: 'ZOOM',
 };
 
-// Define session schema
 const sessionSchema = new mongoose.Schema(
     {
         title: { type: String, required: true },
@@ -22,18 +21,19 @@ const sessionSchema = new mongoose.Schema(
         mentor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         participants: [
             {
-                user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-                email: { type: String, required: true },
+                user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+                email: { type: String },
                 joinedAt: { type: Date },
                 leftAt: { type: Date },
             },
         ],
         date: { type: Date, required: true },
+        startTime: { type: Date, required: true },  // ✅ Add startTime field
         duration: { type: Number, required: true }, // Duration in minutes
         status: { type: String, enum: Object.values(sessionStatuses), default: sessionStatuses.SCHEDULED },
         meetingLink: { type: String, unique: true, required: true },
         platform: { type: String, enum: Object.values(platforms), required: true },
-        resources: [{ type: String }], // URLs or file links for resources shared during the session
+        resources: [{ type: String }],
         reminders: [
             {
                 time: { type: Date, required: true },
@@ -74,19 +74,33 @@ sessionSchema.statics.findUpcomingSessions = async function (minutesAhead = 10) 
 
     return this.find({
         status: sessionStatuses.SCHEDULED,
-        date: { $lte: soon },
+        startTime: { $lte: soon },
     });
 };
 
-// Middleware to validate and generate meeting link if necessary
 sessionSchema.pre('save', async function (next) {
+    if (!this.startTime) {
+        this.startTime = this.date; // ✅ Use `date` as `startTime` if not provided
+    }
+
     if (!this.meetingLink) {
-        // Generate meeting link dynamically based on platform
         if (this.platform === platforms.GOOGLE) {
-            this.meetingLink = await generateGoogleMeetLink(this.title, this.date, this.duration);
+            this.meetingLink = await generateGoogleMeetLink(this.title, this.startTime, this.duration);
         } else if (this.platform === platforms.ZOOM) {
-            this.meetingLink = await generateZoomMeetingLink(this.title, this.date, this.duration);
+            this.meetingLink = await generateZoomMeetingLink(this.title, this.startTime, this.duration);
         }
+    }
+
+    if (this.isNew) {
+        const reminderTimes = [
+            new Date(this.startTime.getTime() - (24 * 60 * 60 * 1000)), // 24 hours before
+            new Date(this.startTime.getTime() - (60 * 60 * 1000)), // 1 hour before
+        ];
+
+        this.reminders = reminderTimes.map(time => ({
+            time,
+            sent: false
+        }));
     }
 
     if (!this.meetingLink) {

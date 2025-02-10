@@ -2,16 +2,27 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
 
 async function verifyToken(req, res, next) {
-    const token = req.headers.authorization?.split(' ')[1];
-
-    if (!token) {
-        return res.status(401).json({ error: 'No token provided' });
+    // Allow public routes without token verification
+    const publicRoutes = ['/signup', '/signin', '/api/auth/google/callback'];
+    if (publicRoutes.some(route => req.path.includes(route))) {
+        return next();
     }
 
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findById(decoded.userId);
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized. Token is required.' });
+    }
 
+    const token = authHeader.split(' ')[1];
+
+    try {
+        console.log('Authorization Header:', req.headers.authorization);
+        console.log('Extracted Token:', token);
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        console.log('Decoded Token:', decoded);
+
+        const user = await User.findOne({ user_id: decoded.user_id });
         if (!user) {
             return res.status(401).json({ error: 'User not found' });
         }
@@ -20,13 +31,13 @@ async function verifyToken(req, res, next) {
         next();
     } catch (error) {
         console.error('Token verification error:', error);
-        res.status(401).json({ error: 'Invalid token' });
+        return res.status(401).json({ error: 'Authentication failed' });
     }
 }
 
 function checkPermissions(permission) {
     return (req, res, next) => {
-        if (!req.user.hasPermission(permission)) {
+        if (!req.user.permissions || !req.user.permissions.includes(permission)) {
             return res.status(403).json({ error: 'Permission denied' });
         }
         next();

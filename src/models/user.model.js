@@ -33,7 +33,7 @@ const rolePermissions = {
     [roles.ADMIN]: Object.values(permissions),
     [roles.LEADERSHIP]: [permissions.CREATE_MEETING, permissions.VIEW_MEETING],
     [roles.MENTOR]: [permissions.CREATE_MEETING, permissions.VIEW_MEETING, permissions.EDIT_MEETING],
-    [roles.STUDENT]: [permissions.VIEW_MEETING],
+    [roles.STUDENT]: [permissions.CREATE_MEETING, permissions.VIEW_MEETING],
     [roles.TEACHER]: [permissions.CREATE_MEETING, permissions.VIEW_MEETING],
 };
 
@@ -44,7 +44,7 @@ const userSchema = new mongoose.Schema(
         student_code: { type: String, unique: true, sparse: true },
         email: { type: String, unique: true, required: true },
         name: { type: String, required: true },
-        roles: { type: [String], enum: Object.values(roles), default: [roles.STUDENT] },  // Multiple roles supported
+        role: { type: [String], enum: Object.values(roles), default: [roles.STUDENT] },  // Multiple roles supported
         status: { type: String, enum: Object.values(statuses), default: statuses.PENDING },
         isVerified: { type: Boolean, default: false },
         password: { type: String, required: true },
@@ -68,10 +68,10 @@ userSchema.pre('save', async function (next) {
             this.password = await bcrypt.hash(this.password, salt);
         }
 
-        if (this.isModified('roles')) {
+        if (this.isModified('role')) {
             // Combine permissions for all roles
             const allPermissions = new Set();
-            this.roles.forEach(role => {
+            this.role.forEach(role => {
                 (rolePermissions[role] || []).forEach(permission => allPermissions.add(permission));
             });
             this.permissions = Array.from(allPermissions);

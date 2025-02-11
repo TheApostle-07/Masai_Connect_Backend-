@@ -11,9 +11,9 @@ const { checkUserStatus } = require('./middleware/checkUserStatus');
 const getUserStatusRoutes = require('./routes/get-user-status');
 const meetingsRoute = require('./routes/meetings');
 const connectDB = require("./config/db");
+const redisClient = require('./config/redisClient'); 
 const sessionRoutes = require('./routes/session.routes');
-require("./jobs/sessionQueue"); 
-require("./jobs/sessionCronJob"); 
+require('./jobs/sessionUpdater');
 require('./jobs');
 
 
@@ -81,7 +81,7 @@ app.use((req, res) => {
 // ======= Global Error Handler =======
 app.use((err, req, res, next) => {
     console.error('Server error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
 // ======= Start Server =======
@@ -94,5 +94,6 @@ app.listen(PORT, () => {
 process.on('SIGINT', async () => {
     console.log('Shutting down gracefully...');
     await mongoose.disconnect();
-    process.exit(0);  // Fixed Typo (process. Exit → process.exit)
+    await redisClient.quit(); // Ensure Redis connection is closed
+    process.exit(0);
 });

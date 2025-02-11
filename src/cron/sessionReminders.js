@@ -50,13 +50,7 @@ cron.schedule("* * * * *", async () => {
 
         for (let participant of session.participants) {
           console.log(`📧 Sending email to: ${participant.email}`);
-
-          // await sendEmail({
-          //     to: participant.email,
-          //     subject: `Reminder: Upcoming Session - ${session.title}`,
-          //     text: `Your session "${session.title}" is starting at ${session.startTime}. Click here to join: ${session.meetingLink}`,
-          // });
-
+          
           await sendEmail({
             to: participant.email,
             subject: `Reminder: Upcoming Session - ${session.title}`,
